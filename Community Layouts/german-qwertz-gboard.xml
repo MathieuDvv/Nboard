@@ -1,0 +1,24 @@
+ 
+<?xml version="1.0" encoding="utf-8"?>
+<layout-pack
+    id="community.german.pro"
+    name="Deutsch Pro"
+    bottomStyle="classic"
+    qwertyLike="true">
+
+    <row1>q w e r t z u i o p ü</row1>
+    <row2>a s d f g h j k l ö ä</row2>
+    <row3>y x c v b n m , .</row3>
+
+    <variants>
+        <key value=".">! ? ; : - _</key>
+        <key value=",">/ ( ) " '</key>
+        
+        <key value="a">ä á à â</key>
+        <key value="o">ö ó ò ô</key>
+        <key value="u">ü ú ù û</key>
+        <key value="s">ß ś š</key>
+        <key value="e">€ é è ê</key>
+        <key value="i">í ì î</key>
+    </variants>
+</layout-pack>
