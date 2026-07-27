@@ -1,6 +1,6 @@
 # Nboard
 
-![Version](https://img.shields.io/badge/version-1.4.1-yellow)
+![Version](https://img.shields.io/badge/version-1.5.1-yellow)
 ![Android](https://img.shields.io/badge/android-8.0%2B%20(API%2026)-grey)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-lightgrey)
 
@@ -30,7 +30,7 @@ Built for Nothing Phone users who wanted a keyboard matching their device's mini
 
 ## Project Status
 
-Nboard is **feature-complete** and in maintenance mode after v1.4.1.
+Nboard is **feature-complete** and returns to maintenance mode after the v1.5.0 community celebration release.
 
 I built this keyboard to solve my own problem: wanting a Nothing-inspired keyboard with AI tools. It works great, and I use it daily.
 
@@ -58,15 +58,17 @@ If you want additional features, fork it! It's open source (AGPL-3.0) for exactl
 - Gboard punctuation row improvements (`','`, `'.'`, and `'`) with adaptive left punctuation key (`/` in URL fields, `@` in email fields)
 - Optional number row toggle in settings
 - Spacebar cursor swipe
-- Haptics and press animations
+- Configurable key haptics (`Off`, `System`, `Light`, `Medium`, `Strong`) and press animations
+- Two quick language profiles with custom names, a dedicated configuration page, per-profile special keys, and a configurable language-switch key
 - Clipboard history with pin/delete + recent chip for text/images
 - Emoji browser + search mode
-- AI tools (Summarize, Fix Grammar, Expand, free prompt with selected-text context support, language preserved by default)
+- AI tools through Gemini, Anthropic, or preset/custom OpenAI-compatible providers (Summarize, Fix Grammar, Expand, free prompt with selected-text context support, language preserved by default)
 - Contextual action icon based on input field type
 - Theme options: `System`, `Light`, `Dark`, `AMOLED Black`
 - Font options: `Inter` / `Roboto`
-- Configurable side mode keys (AI / Clipboard / Emoji) on classic layouts
-- Gboard tool key behavior with press-and-hold quick access for AI / Clipboard / Emoji
+- Configurable side mode keys (AI / Clipboard / Emoji / Language / Apostrophe) on classic layouts
+- Language and apostrophe actions for configurable side keys
+- Gboard tool key behavior with press-and-hold quick access for AI / Clipboard / Emoji / Language / Apostrophe
 
 ## Beta Features
 
@@ -155,7 +157,7 @@ If you want to support Nboard development:
 3. Install on device:
 
 ```bash
-adb install -r path/to/NBoard-v1.4.1-release.apk
+adb install -r path/to/NBoard-v1.5.1-release.apk
 ```
 
 4. On Android, enable **Nboard** in keyboard settings.
@@ -206,9 +208,11 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 Architecture and contributor onboarding are documented in [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md).
 
-## AI Key Setup (Optional)
+## AI Provider Setup (Optional)
 
-If you want AI features locally:
+Nboard supports Gemini, Anthropic, and HTTPS OpenAI-compatible chat-completions providers. Choose the provider in `Settings` → `AI settings`.
+
+For Gemini, choose a supported model and paste your Gemini API key in the app. Local builds may also provide a fallback key:
 
 1. Copy `local.properties.example` to `local.properties`
 2. Add your Gemini key:
@@ -219,9 +223,21 @@ GEMINI_API_KEY=YOUR_API_KEY_HERE
 
 You can also set/update the key directly from the app settings.
 
+For Anthropic, choose a Claude model and paste an Anthropic API key.
+
+For an OpenAI-compatible provider:
+
+- choose an endpoint preset for OpenAI, DeepSeek, Kimi, Groq, or OpenRouter;
+- optionally adjust the preset model identifier;
+- paste the API key issued by that service.
+
+Choose `Custom` to enter a different HTTPS base URL and model identifier.
+
+Nboard sends requests to `<base URL>/chat/completions`.
+
 ## Privacy & Security
 
-- AI features require internet access and send prompt text to the Gemini API.
+- AI features require internet access and send prompt text to the provider selected in settings.
 - Clipboard history is stored locally on device.
 - No telemetry or usage tracking is implemented.
 - Nboard is open source, so behavior is fully auditable.
@@ -247,8 +263,8 @@ You can also set/update the key directly from the app settings.
   - Re-open the target app input field.
 - **AI features not working**
   - Confirm internet connection is available.
-  - Verify Gemini API key is set correctly.
-  - Check Gemini API quota/billing limits.
+  - Verify the selected provider, model, URL, and API key.
+  - Check the provider's quota or billing limits.
 - **Swipe typing not working**
   - Swipe Typing is still beta.
   - Make sure it is enabled in settings.

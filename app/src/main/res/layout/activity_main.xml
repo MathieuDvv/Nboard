@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/settingsScroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -226,6 +227,53 @@
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_down_lucide"
                     android:tint="?android:attr/textColorPrimary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:alpha="0.2"
+                android:background="?android:attr/textColorPrimary" />
+
+            <LinearLayout
+                android:id="@+id/languageProfilesRow"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/inter_variable"
+                    android:text="Quick language profiles"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/languageProfilesValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/inter_variable"
+                    android:maxWidth="175dp"
+                    android:maxLines="2"
+                    android:text="A / B"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="13sp" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron_down_lucide"
+                    app:tint="?android:attr/textColorPrimary" />
             </LinearLayout>
 
             <View
@@ -814,6 +862,50 @@
             android:orientation="vertical">
 
             <LinearLayout
+                android:id="@+id/hapticModeRow"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/inter_variable"
+                    android:text="Key vibration"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/hapticModeValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:fontFamily="@font/inter_variable"
+                    android:text="System"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron_down_lucide"
+                    app:tint="?android:attr/textColorPrimary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:alpha="0.2"
+                android:background="?android:attr/textColorPrimary" />
+
+            <LinearLayout
                 android:id="@+id/leftKeyModesRow"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
@@ -907,11 +999,16 @@
             android:textStyle="bold" />
 
         <LinearLayout
-            android:id="@+id/apiKeyRow"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:background="@drawable/bg_settings_card"
+            android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/aiProviderRow"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
@@ -924,7 +1021,97 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="@font/inter_variable"
-                android:text="Set API Key"
+                android:text="Choose provider"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/aiProviderValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:fontFamily="@font/inter_variable"
+                android:text="Gemini"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_chevron_down_lucide"
+                app:tint="?android:attr/textColorPrimary" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:alpha="0.2"
+            android:background="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:id="@+id/geminiModelRow"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:id="@+id/aiModelLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/inter_variable"
+                android:text="Gemini model"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/geminiModelValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:fontFamily="@font/inter_variable"
+                android:text="Gemini 3.6 Flash"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_chevron_down_lucide"
+                app:tint="?android:attr/textColorPrimary" />
+        </LinearLayout>
+
+        <View
+            android:id="@+id/aiModelDivider"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:alpha="0.2"
+            android:background="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:id="@+id/apiKeyRow"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/inter_variable"
+                android:text="Provider configuration"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textSize="15sp" />
 
@@ -936,6 +1123,7 @@
                 android:text="****************"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textSize="15sp" />
+        </LinearLayout>
         </LinearLayout>
 
         <TextView

@@ -49,7 +49,7 @@ Most behavior is implemented in extension modules under `app/src/main/java/com/n
   - Emoji panel rendering/search
 
 - `NboardImeBottomModes.kt`
-  - AI/Clipboard/Emoji mode switching
+  - AI/Clipboard/Emoji/Language/Apostrophe mode switching
   - Bottom-row UI state and visibility transitions
 
 - `NboardImeClipboard.kt`
@@ -139,7 +139,7 @@ Areas to keep lightweight:
 ## Privacy Model
 
 - Core typing intelligence (autocorrect/prediction/smart typing): local/on-device.
-- Remote calls only for optional AI prompt features (`GeminiClient`) and voice services depending on platform recognizer behavior.
+- Remote calls only for optional AI prompt features (`TextGenerationClient`, with Gemini, Anthropic Messages, and OpenAI-compatible implementations) and voice services depending on platform recognizer behavior.
 
 ## Release Checklist
 

@@ -63,8 +63,18 @@ internal data class SwipeTypingSession(
     val tokens: MutableList<String>,
     val dwellDurationsMs: MutableList<Long>,
     val trailPoints: MutableList<SwipeTrailView.TrailPoint>,
+    val pathPoints: MutableList<SwipePoint>,
     var lastTokenEnteredAtMs: Long,
+    var lastRawX: Float,
+    var lastRawY: Float,
+    var lastSampleAtMs: Long,
     var isSwiping: Boolean
+)
+
+data class SwipeSamplePoint(
+    val x: Float,
+    val y: Float,
+    val fraction: Float
 )
 
 internal data class AutoCorrectionVariant(

@@ -115,7 +115,7 @@
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
                 android:fontFamily="@font/inter_variable"
-                android:hint="Ask Gemini"
+                android:hint="Ask AI"
                 android:imeOptions="actionSend"
                 android:inputType="textMultiLine"
                 android:maxLines="8"
@@ -388,7 +388,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <LinearLayout
+        <com.nboard.ime.NearestKeyLayout
             android:id="@+id/keyRowsStack"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -423,7 +423,7 @@
                 android:layout_marginBottom="8dp"
                 android:gravity="bottom"
                 android:orientation="horizontal" />
-        </LinearLayout>
+        </com.nboard.ime.NearestKeyLayout>
 
         <com.nboard.ime.SwipeTrailView
             android:id="@+id/swipeTrailView"

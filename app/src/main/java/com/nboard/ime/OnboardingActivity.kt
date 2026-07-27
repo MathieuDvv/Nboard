@@ -358,7 +358,7 @@ class OnboardingActivity : AppCompatActivity() {
         val selected = if (aiEnabled) 0 else 1
 
         AlertDialog.Builder(this)
-            .setTitle("Gemini integration")
+            .setTitle("AI integration (Gemini default)")
             .setSingleChoiceItems(options, selected) { dialog, which ->
                 aiEnabled = which == 0
                 aiEnabledValue.text = if (aiEnabled) "Enabled" else "Disabled"

@@ -15,6 +15,21 @@ import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.view.ViewCompat
 
+data class HapticEffectSpec(
+    val durationMs: Long,
+    val amplitude: Int
+)
+
+internal fun hapticEffectSpec(mode: HapticMode): HapticEffectSpec? {
+    return when (mode) {
+        HapticMode.LIGHT -> HapticEffectSpec(6L, 60)
+        HapticMode.MEDIUM -> HapticEffectSpec(10L, 120)
+        HapticMode.STRONG -> HapticEffectSpec(16L, 200)
+        HapticMode.OFF,
+        HapticMode.SYSTEM -> null
+    }
+}
+
 internal fun NboardImeService.bindPressAction(view: View, onTap: () -> Unit) {
     configureKeyTouch(view, repeatOnHold = false, longPressAction = null, tapOnDown = false, onTap = onTap)
 }
@@ -282,6 +297,7 @@ internal fun NboardImeService.configureKeyTouch(
 
                 if (swipeActiveForThisPointer && !longPressTriggered) {
                     swipeActiveForThisPointer = false
+                    updateSwipeTyping(event.rawX, event.rawY)
                     if (finishSwipeTypingAndCommit()) {
                         return@setOnTouchListener true
                     }
@@ -342,26 +358,25 @@ internal fun NboardImeService.configureKeyTouch(
 }
 
 internal fun NboardImeService.performKeyHaptic(view: View) {
-    val performed = view.performHapticFeedback(
-        HapticFeedbackConstants.KEYBOARD_TAP,
-        HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-    )
-    if (!performed) {
-        try {
-            val deviceVibrator = vibrator
-            if (deviceVibrator?.hasVibrator() == true) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    deviceVibrator.vibrate(
-                        VibrationEffect.createOneShot(10L, VibrationEffect.DEFAULT_AMPLITUDE)
-                    )
-                } else {
-                    @Suppress("DEPRECATION")
-                    deviceVibrator.vibrate(10L)
-                }
-            }
-        } catch (_: Exception) {
-            // Keep typing responsive.
+    when (hapticMode) {
+        HapticMode.OFF -> return
+        HapticMode.SYSTEM -> {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            return
         }
+        else -> Unit
+    }
+
+    val effect = hapticEffectSpec(hapticMode) ?: return
+    try {
+        val deviceVibrator = vibrator
+        if (deviceVibrator?.hasVibrator() == true) {
+            deviceVibrator.vibrate(
+                VibrationEffect.createOneShot(effect.durationMs, effect.amplitude)
+            )
+        }
+    } catch (_: Exception) {
+        // Keep typing responsive.
     }
 }
 

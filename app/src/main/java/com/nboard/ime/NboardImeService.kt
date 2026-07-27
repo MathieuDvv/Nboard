@@ -67,6 +67,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import com.nboard.ime.ai.GeminiClient
+import com.nboard.ime.ai.AnthropicClient
+import com.nboard.ime.ai.OpenAiCompatibleClient
+import com.nboard.ime.ai.TextGenerationClient
 import com.nboard.ime.clipboard.ClipboardHistoryStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,7 +91,7 @@ class NboardImeService : InputMethodService() {
     internal var clipboardManager: ClipboardManager? = null
     internal var vibrator: Vibrator? = null
     internal lateinit var clipboardHistoryStore: ClipboardHistoryStore
-    internal lateinit var geminiClient: GeminiClient
+    internal lateinit var textGenerationClient: TextGenerationClient
     private var interTypeface: Typeface? = null
 
     internal lateinit var keyboardRoot: LinearLayout
@@ -172,6 +175,7 @@ class NboardImeService : InputMethodService() {
     internal var autoSpaceAfterPunctuationEnabled = true
     internal var autoCapitalizeAfterPunctuationEnabled = true
     internal var returnToLettersAfterNumberSpaceEnabled = true
+    internal var hapticMode = HapticMode.SYSTEM
 
     internal val emojiUsageCounts = mutableMapOf<String, Int>()
     internal val emojiRecents = ArrayDeque<String>()
@@ -395,6 +399,7 @@ class NboardImeService : InputMethodService() {
         swipeTypingEnabled = KeyboardModeSettings.loadSwipeTypingEnabled(this)
         swipeTrailEnabled = KeyboardModeSettings.loadSwipeTrailEnabled(this)
         voiceInputEnabled = KeyboardModeSettings.loadVoiceInputEnabled(this)
+        hapticMode = KeyboardModeSettings.loadHapticMode(this)
         isNumberRowEnabled = KeyboardModeSettings.loadNumberRowEnabled(this)
         autoSpaceAfterPunctuationEnabled = KeyboardModeSettings.loadAutoSpaceAfterPunctuationEnabled(this)
         autoCapitalizeAfterPunctuationEnabled = KeyboardModeSettings.loadAutoCapitalizeAfterPunctuationEnabled(this)
@@ -404,9 +409,25 @@ class NboardImeService : InputMethodService() {
             KeyboardFontMode.ROBOTO -> Typeface.create("sans-serif", Typeface.NORMAL)
         }
 
-        val storedKey = KeyboardModeSettings.loadGeminiApiKey(this)
-        val apiKey = storedKey.ifBlank { BuildConfig.GEMINI_API_KEY }
-        geminiClient = GeminiClient(apiKey)
+        textGenerationClient = when (KeyboardModeSettings.loadAiProvider(this)) {
+            AiProvider.GEMINI -> {
+                val storedKey = KeyboardModeSettings.loadGeminiApiKey(this)
+                val apiKey = storedKey.ifBlank { BuildConfig.GEMINI_API_KEY }
+                GeminiClient(
+                    apiKey = apiKey,
+                    model = KeyboardModeSettings.loadGeminiModel(this).modelId
+                )
+            }
+            AiProvider.ANTHROPIC -> AnthropicClient(
+                apiKey = KeyboardModeSettings.loadAnthropicApiKey(this),
+                model = KeyboardModeSettings.loadAnthropicModel(this).modelId
+            )
+            AiProvider.OPENAI_COMPATIBLE -> OpenAiCompatibleClient(
+                baseUrl = KeyboardModeSettings.loadOpenAiBaseUrl(this),
+                model = KeyboardModeSettings.loadOpenAiModel(this),
+                apiKey = KeyboardModeSettings.loadOpenAiApiKey(this)
+            )
+        }
     }
 
     private fun createKeyboardUiContext(): Context {
@@ -455,9 +476,9 @@ class NboardImeService : InputMethodService() {
         }
     }
 
-    private fun reloadBottomModesFromSettings() {
+    internal fun reloadBottomModesFromSettings() {
         if (isGboardLayoutActive()) {
-            leftBottomModeOptions = listOf(BottomKeyMode.AI, BottomKeyMode.CLIPBOARD, BottomKeyMode.EMOJI)
+            leftBottomModeOptions = BottomKeyMode.entries
             rightBottomModeOptions = emptyList()
 
             val (left, right) = KeyboardModeSettings.load(this)
@@ -988,7 +1009,9 @@ class NboardImeService : InputMethodService() {
 
         val alphaRow1 = activeLayoutPack.row1
         val alphaRow2 = activeLayoutPack.row2
-        val alphaRow3 = activeLayoutPack.row3
+        val alphaRow3 = activeLayoutPack.row3.filterNot {
+            it == "'" && hasApostropheBottomSlot()
+        }
         val alphaRow3Weight = if (isQwertyLayoutActive()) 0.875f else 1f
 
         val topNumberVariants = if (isNumberRowEnabled) {
@@ -1388,7 +1411,7 @@ class NboardImeService : InputMethodService() {
         }
 
         val modeOptions = when {
-            isGboardLayoutActive() -> listOf(BottomKeyMode.AI, BottomKeyMode.CLIPBOARD, BottomKeyMode.EMOJI)
+            isGboardLayoutActive() -> BottomKeyMode.entries
             isLeftSlot -> leftBottomModeOptions
             else -> rightBottomModeOptions
         }
@@ -1449,6 +1472,7 @@ class NboardImeService : InputMethodService() {
                 }
 
                 KeyboardModeSettings.save(this, leftBottomMode, rightBottomMode)
+                renderKeyRows()
                 refreshUi()
             }
             optionViews.add(item)
@@ -1542,6 +1566,15 @@ class NboardImeService : InputMethodService() {
             return true
         }
         return leftBottomMode == BottomKeyMode.EMOJI || rightBottomMode == BottomKeyMode.EMOJI
+    }
+
+    internal fun hasApostropheBottomSlot(): Boolean {
+        return if (isGboardLayoutActive()) {
+            leftBottomMode == BottomKeyMode.APOSTROPHE
+        } else {
+            BottomKeyMode.APOSTROPHE in leftBottomModeOptions ||
+                BottomKeyMode.APOSTROPHE in rightBottomModeOptions
+        }
     }
 
     internal fun isEmojiSearchActive(): Boolean {

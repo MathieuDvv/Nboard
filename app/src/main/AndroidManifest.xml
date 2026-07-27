@@ -26,6 +26,10 @@
             android:name=".OnboardingActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".LanguageProfilesActivity"
+            android:exported="false" />
+
         <service
             android:name=".NboardImeService"
             android:directBootAware="true"

@@ -11,41 +11,26 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-class GeminiClient(private val apiKey: String) {
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
+class GeminiClient(
+    private val apiKey: String,
+    private val model: String,
+    private val endpointBaseUrl: String = "https://generativelanguage.googleapis.com/v1beta",
+    private val httpClient: OkHttpClient = defaultHttpClient()
+) : TextGenerationClient {
 
-    val isConfigured: Boolean
-        get() = apiKey.isNotBlank()
+    override val isConfigured: Boolean
+        get() = apiKey.isNotBlank() && model.isNotBlank()
 
-    suspend fun generateText(
+    override suspend fun generateText(
         prompt: String,
-        systemInstruction: String? = null,
-        outputCharLimit: Int = 0
+        systemInstruction: String?,
+        outputCharLimit: Int
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!isConfigured) {
             return@withContext Result.failure(IllegalStateException("Gemini API key missing"))
         }
 
-        var lastNotFoundError: Exception? = null
-        MODEL_FALLBACKS.forEach { model ->
-            val result = generateWithModel(prompt, model, systemInstruction, outputCharLimit)
-            if (result.isSuccess) {
-                return@withContext result
-            }
-
-            val failure = result.exceptionOrNull()
-            if (failure is GeminiHttpException && failure.httpCode == 404) {
-                lastNotFoundError = failure
-            } else {
-                return@withContext result
-            }
-        }
-
-        Result.failure(lastNotFoundError ?: IOException("No compatible Gemini model available"))
+        generateWithModel(prompt, model, systemInstruction, outputCharLimit)
     }
 
     private fun generateWithModel(
@@ -54,8 +39,7 @@ class GeminiClient(private val apiKey: String) {
         systemInstruction: String?,
         outputCharLimit: Int
     ): Result<String> {
-        val url =
-            "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        val url = "${endpointBaseUrl.trimEnd('/')}/models/$model:generateContent?key=$apiKey"
         val requestJson = JSONObject()
             .put(
                 "contents",
@@ -69,7 +53,6 @@ class GeminiClient(private val apiKey: String) {
             .put(
                 "generationConfig",
                 JSONObject()
-                    .put("temperature", 0.3)
                     .put("maxOutputTokens", 256)
             )
 
@@ -177,10 +160,12 @@ class GeminiClient(private val apiKey: String) {
     ) : IOException(detail)
 
     companion object {
-        private val MODEL_FALLBACKS = listOf(
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-flash-latest"
-        )
+        private fun defaultHttpClient(): OkHttpClient {
+            return OkHttpClient.Builder()
+                .connectTimeout(12, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build()
+        }
     }
 }

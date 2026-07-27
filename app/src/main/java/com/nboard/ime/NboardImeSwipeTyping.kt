@@ -3,6 +3,83 @@ package com.nboard.ime
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
+import kotlin.math.ceil
+import kotlin.math.ln
+import java.util.Locale
+
+internal fun interpolateSwipeSegment(
+    fromX: Float,
+    fromY: Float,
+    toX: Float,
+    toY: Float,
+    maxStep: Float
+): List<SwipeSamplePoint> {
+    if (maxStep <= 0f) return listOf(SwipeSamplePoint(toX, toY, 1f))
+    val dx = toX - fromX
+    val dy = toY - fromY
+    val distance = kotlin.math.hypot(dx.toDouble(), dy.toDouble()).toFloat()
+    val steps = ceil(distance / maxStep).toInt().coerceIn(1, 64)
+    return (1..steps).map { index ->
+        val fraction = index.toFloat() / steps
+        SwipeSamplePoint(
+            x = fromX + dx * fraction,
+            y = fromY + dy * fraction,
+            fraction = fraction
+        )
+    }
+}
+
+internal fun reduceSwipeIntentTokens(
+    tokens: List<String>,
+    dwellDurationsMs: List<Long>,
+    dwellThresholdMs: Long = SWIPE_DWELL_COMMIT_MS
+): List<String> {
+    if (tokens.isEmpty()) return emptyList()
+    val normalizedTokens = tokens.map { it.lowercase(Locale.ROOT) }
+    val reduced = mutableListOf<String>()
+    val lastIndex = normalizedTokens.lastIndex
+    normalizedTokens.forEachIndexed { index, token ->
+        if (token.length != 1 || !token.first().isLetter()) return@forEachIndexed
+        val dwell = dwellDurationsMs.getOrNull(index) ?: 0L
+        val keep = index == 0 || index == lastIndex || dwell >= dwellThresholdMs
+        if (keep && reduced.lastOrNull() != token) {
+            reduced.add(token)
+        }
+    }
+
+    if (reduced.size < 3 && normalizedTokens.size >= 3) {
+        val bestMiddle = (1 until normalizedTokens.lastIndex)
+            .maxByOrNull { dwellDurationsMs.getOrNull(it) ?: 0L }
+            ?.let(normalizedTokens::get)
+            ?.takeIf { it.length == 1 && it.first().isLetter() }
+        if (!bestMiddle.isNullOrBlank()) {
+            val first = reduced.firstOrNull()
+            val last = reduced.lastOrNull()
+            if (first != null && last != null && bestMiddle != first && bestMiddle != last) {
+                reduced.clear()
+                reduced.add(first)
+                reduced.add(bestMiddle)
+                reduced.add(last)
+            }
+        }
+    }
+    return reduced
+}
+
+internal fun isSwipeCandidateConfident(
+    bestScore: Int,
+    secondBestScore: Int,
+    confidentScore: Int = SWIPE_CONFIDENT_SCORE,
+    minimumMargin: Int = SWIPE_MIN_SCORE_MARGIN
+): Boolean {
+    if (bestScore <= confidentScore) {
+        return true
+    }
+    if (secondBestScore == Int.MAX_VALUE) {
+        return false
+    }
+    return secondBestScore - bestScore >= minimumMargin
+}
 
 internal fun NboardImeService.moveCursorLeft() {
     val inputConnection = currentInputConnection ?: return
@@ -51,7 +128,11 @@ internal fun NboardImeService.beginSwipeTyping(anchorView: View, token: String, 
         tokens = mutableListOf(token),
         dwellDurationsMs = mutableListOf(0L),
         trailPoints = mutableListOf(),
+        pathPoints = mutableListOf(SwipePoint(rawX, rawY)),
         lastTokenEnteredAtMs = now,
+        lastRawX = rawX,
+        lastRawY = rawY,
+        lastSampleAtMs = now,
         isSwiping = false
     )
     if (swipeTrailEnabled) {
@@ -87,21 +168,72 @@ internal fun NboardImeService.updateSwipeTyping(rawX: Float, rawY: Float): Boole
 
     appendSwipeTrailPoint(rawX, rawY, force = false)
 
-    val token = findSwipeTokenAt(rawX, rawY) ?: return true
-    val last = session.tokens.lastOrNull()
-    if (token != last) {
-        val now = SystemClock.elapsedRealtime()
-        val lastIndex = session.dwellDurationsMs.lastIndex
-        if (lastIndex >= 0) {
-            val delta = (now - session.lastTokenEnteredAtMs).coerceAtLeast(0L)
-            session.dwellDurationsMs[lastIndex] = session.dwellDurationsMs[lastIndex] + delta
+    val now = SystemClock.elapsedRealtime()
+    val previousAt = session.lastSampleAtMs
+    val samples = interpolateSwipeSegment(
+        fromX = session.lastRawX,
+        fromY = session.lastRawY,
+        toX = rawX,
+        toY = rawY,
+        maxStep = dp(SWIPE_INTERPOLATION_STEP_DP).toFloat()
+    )
+    samples.forEachIndexed { index, sample ->
+        appendSwipePathPoint(session, sample.x, sample.y)
+        val token = findSwipeTokenAt(sample.x, sample.y) ?: return@forEachIndexed
+        val sampleAt = previousAt + ((now - previousAt) * sample.fraction).toLong()
+        recordSwipeToken(
+            session = session,
+            token = token,
+            sampleAtMs = sampleAt,
+            emitHaptic = index == samples.lastIndex
+        )
+    }
+    session.lastRawX = rawX
+    session.lastRawY = rawY
+    session.lastSampleAtMs = now
+    return true
+}
+
+private fun NboardImeService.appendSwipePathPoint(
+    session: SwipeTypingSession,
+    rawX: Float,
+    rawY: Float
+) {
+    val point = SwipePoint(rawX, rawY)
+    val previous = session.pathPoints.lastOrNull()
+    if (previous != null) {
+        val dx = point.x - previous.x
+        val dy = point.y - previous.y
+        val minimumStep = dp(SWIPE_PATH_MIN_STEP_DP).toFloat()
+        if (dx * dx + dy * dy < minimumStep * minimumStep) {
+            return
         }
-        session.tokens.add(token)
-        session.dwellDurationsMs.add(0L)
-        session.lastTokenEnteredAtMs = now
+    }
+    session.pathPoints.add(point)
+    if (session.pathPoints.size > SWIPE_PATH_MAX_POINTS) {
+        // Keep the exact gesture endpoints while thinning the oldest interior sample.
+        session.pathPoints.removeAt(1)
+    }
+}
+
+private fun NboardImeService.recordSwipeToken(
+    session: SwipeTypingSession,
+    token: String,
+    sampleAtMs: Long,
+    emitHaptic: Boolean
+) {
+    if (token == session.tokens.lastOrNull()) return
+    val lastIndex = session.dwellDurationsMs.lastIndex
+    if (lastIndex >= 0) {
+        val delta = (sampleAtMs - session.lastTokenEnteredAtMs).coerceAtLeast(0L)
+        session.dwellDurationsMs[lastIndex] = session.dwellDurationsMs[lastIndex] + delta
+    }
+    session.tokens.add(token)
+    session.dwellDurationsMs.add(0L)
+    session.lastTokenEnteredAtMs = sampleAtMs
+    if (emitHaptic) {
         performKeyHaptic(session.ownerView)
     }
-    return true
 }
 
 internal fun NboardImeService.finishSwipeTypingAndCommit(): Boolean {
@@ -198,47 +330,156 @@ internal fun NboardImeService.findSwipeTokenAt(rawX: Float, rawY: Float): String
 }
 
 internal fun NboardImeService.extractSwipeIntentTokens(session: SwipeTypingSession): List<String> {
-    if (session.tokens.isEmpty()) {
-        return emptyList()
-    }
-    val reduced = mutableListOf<String>()
-    val lastIndex = session.tokens.lastIndex
-    session.tokens.forEachIndexed { index, rawToken ->
-        val token = normalizeWord(rawToken)
-        if (token.length != 1 || !token.first().isLetter()) {
-            return@forEachIndexed
-        }
-        val dwell = session.dwellDurationsMs.getOrNull(index) ?: 0L
-        val keep = index == 0 || index == lastIndex || dwell >= SWIPE_DWELL_COMMIT_MS
-        if (keep) {
-            if (reduced.lastOrNull() != token) {
-                reduced.add(token)
-            }
-        }
-    }
-
-    if (reduced.size < 3 && session.tokens.size >= 3) {
-        val middleRange = 1 until session.tokens.lastIndex
-        val bestMiddle = middleRange
-            .maxByOrNull { session.dwellDurationsMs.getOrNull(it) ?: 0L }
-            ?.let { session.tokens[it] }
-            ?.let(::normalizeWord)
-            ?.takeIf { it.length == 1 && it.first().isLetter() }
-        if (!bestMiddle.isNullOrBlank()) {
-            val first = reduced.firstOrNull()
-            val last = reduced.lastOrNull()
-            if (first != null && last != null && bestMiddle != first && bestMiddle != last) {
-                reduced.clear()
-                reduced.add(first)
-                reduced.add(bestMiddle)
-                reduced.add(last)
-            }
-        }
-    }
-    return reduced
+    return reduceSwipeIntentTokens(session.tokens, session.dwellDurationsMs)
 }
 
 internal fun NboardImeService.resolveSwipeWord(tokens: List<String>, session: SwipeTypingSession): String? {
+    return resolveSwipeWordByGeometry(tokens, session)
+        ?: resolveSwipeWordByTokens(tokens, session)
+}
+
+private data class SwipeKeyboardGeometry(
+    val keyCenters: Map<Char, SwipePoint>,
+    val keySize: Float
+)
+
+private data class ScoredSwipeWord(
+    val word: String,
+    val geometryScore: Float,
+    val adjustedScore: Float
+)
+
+private fun NboardImeService.resolveSwipeWordByGeometry(
+    tokens: List<String>,
+    session: SwipeTypingSession
+): String? {
+    if (tokens.isEmpty() || session.pathPoints.size < 2) return null
+    val pathFirst = tokens.firstNotNullOfOrNull { token ->
+        foldWord(normalizeWord(token)).firstOrNull { it.isLetter() }
+    } ?: return null
+    val keyboardGeometry = currentSwipeKeyboardGeometry() ?: return null
+    if (!keyboardGeometry.keyCenters.containsKey(pathFirst)) return null
+
+    val inputConnection = currentInputConnection
+    val beforeCursor = inputConnection
+        ?.getTextBeforeCursor(PREDICTION_CONTEXT_WINDOW, 0)
+        ?.toString()
+        .orEmpty()
+    val sentenceContext = extractPredictionSentenceContext(beforeCursor)
+    val (previousWord2, previousWord1) = extractPreviousWordsForPrediction(sentenceContext, "")
+    val contextLanguage = detectContextLanguage(beforeCursor)
+
+    val candidateByFoldedWord = LinkedHashMap<String, String>()
+    learnedWordFrequency.entries
+        .asSequence()
+        .filter { (word, _) -> foldWord(word).firstOrNull() == pathFirst }
+        .sortedByDescending { it.value }
+        .take(SWIPE_LEARNED_SCAN_LIMIT)
+        .forEach { (word, _) ->
+            val normalized = normalizeWord(word)
+            candidateByFoldedWord.putIfAbsent(foldWord(normalized), normalized)
+        }
+    listOf(
+        KeyboardLanguageMode.FRENCH to frenchLexicon,
+        KeyboardLanguageMode.ENGLISH to englishLexicon
+    ).forEach { (language, lexicon) ->
+        if (!isLanguageEnabled(language)) return@forEach
+        lexicon.byFirst[pathFirst]
+            .orEmpty()
+            .asSequence()
+            .take(SWIPE_LEXICON_SCAN_LIMIT)
+            .forEach { word ->
+                val normalized = normalizeWord(word)
+                candidateByFoldedWord.putIfAbsent(foldWord(normalized), normalized)
+            }
+    }
+    if (candidateByFoldedWord.isEmpty()) return null
+
+    val matches = rankSwipeGeometryCandidates(
+        trace = session.pathPoints,
+        foldedCandidates = candidateByFoldedWord.keys,
+        keyCenters = keyboardGeometry.keyCenters,
+        keySize = keyboardGeometry.keySize
+    )
+    if (matches.isEmpty()) return null
+
+    val scored = matches.asSequence()
+        .mapNotNull { match ->
+            val candidate = candidateByFoldedWord[match.word] ?: return@mapNotNull null
+            var adjustment = 0f
+            val unigram = learnedWordFrequency[candidate] ?: 0
+            if (unigram > 0) {
+                adjustment -= (ln(1.0 + unigram) * 0.035).toFloat().coerceAtMost(0.18f)
+            }
+            if (!previousWord1.isNullOrBlank()) {
+                val bigram = learnedBigramFrequency[predictionBigramKey(previousWord1, candidate)] ?: 0
+                if (bigram > 0) {
+                    adjustment -= (ln(1.0 + bigram) * 0.07).toFloat().coerceAtMost(0.28f)
+                }
+            }
+            if (!previousWord2.isNullOrBlank() && !previousWord1.isNullOrBlank()) {
+                val trigram = learnedTrigramFrequency[
+                    predictionTrigramKey(previousWord2, previousWord1, candidate)
+                ] ?: 0
+                if (trigram > 0) {
+                    adjustment -= (ln(1.0 + trigram) * 0.09).toFloat().coerceAtMost(0.38f)
+                }
+            }
+            if (FRENCH_WORDS.contains(candidate) || ENGLISH_WORDS.contains(candidate)) {
+                adjustment -= 0.025f
+            }
+            detectWordLanguage(candidate)?.let { language ->
+                adjustment += languageBiasPenalty(language, contextLanguage) * 0.035f
+            }
+            ScoredSwipeWord(
+                word = candidate,
+                geometryScore = match.score,
+                adjustedScore = match.score + adjustment
+            )
+        }
+        .sortedBy { it.adjustedScore }
+        .take(2)
+        .toList()
+    val best = scored.firstOrNull() ?: return null
+    val secondScore = scored.getOrNull(1)?.adjustedScore ?: Float.POSITIVE_INFINITY
+    val margin = secondScore - best.adjustedScore
+    return best.word.takeIf {
+        best.geometryScore <= SWIPE_GEOMETRY_CONFIDENT_SCORE ||
+            (best.geometryScore <= SWIPE_GEOMETRY_FALLBACK_SCORE &&
+                margin >= SWIPE_GEOMETRY_MIN_MARGIN)
+    }
+}
+
+private fun NboardImeService.currentSwipeKeyboardGeometry(): SwipeKeyboardGeometry? {
+    val keyCenters = LinkedHashMap<Char, SwipePoint>()
+    val keySizes = mutableListOf<Float>()
+    val location = IntArray(2)
+    swipeLetterKeyByView.forEach { (view, token) ->
+        if (!view.isShown || view.width <= 0 || view.height <= 0) return@forEach
+        val foldedToken = foldWord(normalizeWord(token))
+        val char = foldedToken.singleOrNull()?.takeIf { it.isLetter() } ?: return@forEach
+        view.getLocationOnScreen(location)
+        keyCenters.putIfAbsent(
+            char,
+            SwipePoint(
+                x = location[0] + view.width / 2f,
+                y = location[1] + view.height / 2f
+            )
+        )
+        keySizes.add(minOf(view.width, view.height).toFloat())
+    }
+    if (keyCenters.size < 2 || keySizes.isEmpty()) return null
+    keySizes.sort()
+    return SwipeKeyboardGeometry(
+        keyCenters = keyCenters,
+        keySize = keySizes[keySizes.size / 2].coerceAtLeast(1f)
+    )
+}
+
+private fun NboardImeService.resolveSwipeWordByTokens(
+    tokens: List<String>,
+    session: SwipeTypingSession
+): String? {
     if (tokens.isEmpty()) {
         return null
     }
@@ -363,13 +604,7 @@ internal fun NboardImeService.resolveSwipeWord(tokens: List<String>, session: Sw
     }
 
     if (!bestWord.isNullOrBlank()) {
-        val margin = secondBestScore - bestScore
-        val confident = when {
-            bestScore <= SWIPE_CONFIDENT_SCORE -> true
-            margin >= SWIPE_MIN_SCORE_MARGIN -> true
-            else -> false
-        }
-        if (confident) {
+        if (isSwipeCandidateConfident(bestScore, secondBestScore)) {
             return bestWord
         }
     }

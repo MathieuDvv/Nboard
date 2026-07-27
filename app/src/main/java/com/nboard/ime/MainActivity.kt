@@ -8,7 +8,11 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +27,7 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var languageValue: TextView
+    private lateinit var languageProfilesValue: TextView
     private lateinit var keyboardValue: TextView
     private lateinit var uploadedLayoutNoticeCard: View
     private lateinit var uploadedLayoutNoticeText: TextView
@@ -34,6 +39,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeTypingValue: TextView
     private lateinit var swipeTrailValue: TextView
     private lateinit var voiceInputValue: TextView
+    private lateinit var hapticModeValue: TextView
+    private lateinit var aiProviderValue: TextView
+    private lateinit var aiModelLabel: TextView
+    private lateinit var geminiModelValue: TextView
+    private lateinit var geminiModelRow: View
+    private lateinit var aiModelDivider: View
     private lateinit var swipeTrailRow: View
     private lateinit var swipeTrailDivider: View
     private lateinit var leftKeyModesRow: View
@@ -59,6 +70,7 @@ class MainActivity : AppCompatActivity() {
 
         statusText = findViewById(R.id.statusText)
         languageValue = findViewById(R.id.languageValue)
+        languageProfilesValue = findViewById(R.id.languageProfilesValue)
         keyboardValue = findViewById(R.id.keyboardValue)
         uploadedLayoutNoticeCard = findViewById(R.id.uploadedLayoutNoticeCard)
         uploadedLayoutNoticeText = findViewById(R.id.uploadedLayoutNoticeText)
@@ -70,6 +82,12 @@ class MainActivity : AppCompatActivity() {
         swipeTypingValue = findViewById(R.id.swipeTypingValue)
         swipeTrailValue = findViewById(R.id.swipeTrailValue)
         voiceInputValue = findViewById(R.id.voiceInputValue)
+        hapticModeValue = findViewById(R.id.hapticModeValue)
+        aiProviderValue = findViewById(R.id.aiProviderValue)
+        aiModelLabel = findViewById(R.id.aiModelLabel)
+        geminiModelValue = findViewById(R.id.geminiModelValue)
+        geminiModelRow = findViewById(R.id.geminiModelRow)
+        aiModelDivider = findViewById(R.id.aiModelDivider)
         swipeTrailRow = findViewById(R.id.swipeTrailRow)
         swipeTrailDivider = findViewById(R.id.swipeTrailDivider)
         leftKeyModesRow = findViewById(R.id.leftKeyModesRow)
@@ -150,8 +168,24 @@ class MainActivity : AppCompatActivity() {
             showLanguageDialog()
         }
 
+        findViewById<View>(R.id.languageProfilesRow).setOnClickListener {
+            startActivity(Intent(this, LanguageProfilesActivity::class.java))
+        }
+
+        findViewById<View>(R.id.hapticModeRow).setOnClickListener {
+            showHapticModeDialog()
+        }
+
+        findViewById<View>(R.id.aiProviderRow).setOnClickListener {
+            showAiProviderDialog()
+        }
+
+        geminiModelRow.setOnClickListener {
+            showProviderModelDialog()
+        }
+
         findViewById<View>(R.id.apiKeyRow).setOnClickListener {
-            showApiKeyDialog()
+            showProviderConfigurationDialog()
         }
 
         findViewById<View>(R.id.wordPredictionRow).setOnClickListener {
@@ -316,7 +350,15 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showApiKeyDialog() {
+    private fun showProviderConfigurationDialog() {
+        when (KeyboardModeSettings.loadAiProvider(this)) {
+            AiProvider.GEMINI -> showGeminiApiKeyDialog()
+            AiProvider.ANTHROPIC -> showAnthropicApiKeyDialog()
+            AiProvider.OPENAI_COMPATIBLE -> showOpenAiConfigurationDialog()
+        }
+    }
+
+    private fun showGeminiApiKeyDialog() {
         val input = EditText(this).apply {
             setText(KeyboardModeSettings.loadGeminiApiKey(this@MainActivity))
             hint = "Paste Gemini API key"
@@ -330,6 +372,259 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 KeyboardModeSettings.saveGeminiApiKey(this, input.text?.toString().orEmpty())
                 refreshValues()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showAiProviderDialog() {
+        val providers = AiProvider.entries
+        val labels = arrayOf("Gemini", "Anthropic", "OpenAI-compatible")
+        val current = KeyboardModeSettings.loadAiProvider(this)
+        AlertDialog.Builder(this)
+            .setTitle("Choose provider")
+            .setSingleChoiceItems(labels, providers.indexOf(current)) { dialog, which ->
+                KeyboardModeSettings.saveAiProvider(this, providers[which])
+                refreshValues()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showProviderModelDialog() {
+        when (KeyboardModeSettings.loadAiProvider(this)) {
+            AiProvider.GEMINI -> {
+                val models = GeminiModel.entries
+                val current = KeyboardModeSettings.loadGeminiModel(this)
+                AlertDialog.Builder(this)
+                    .setTitle("Gemini model")
+                    .setSingleChoiceItems(
+                        models.map { it.displayName }.toTypedArray(),
+                        models.indexOf(current)
+                    ) { dialog, which ->
+                        KeyboardModeSettings.saveGeminiModel(this, models[which])
+                        refreshValues()
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            AiProvider.ANTHROPIC -> {
+                val models = AnthropicModel.entries
+                val current = KeyboardModeSettings.loadAnthropicModel(this)
+                AlertDialog.Builder(this)
+                    .setTitle("Anthropic model")
+                    .setSingleChoiceItems(
+                        models.map { it.displayName }.toTypedArray(),
+                        models.indexOf(current)
+                    ) { dialog, which ->
+                        KeyboardModeSettings.saveAnthropicModel(this, models[which])
+                        refreshValues()
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            AiProvider.OPENAI_COMPATIBLE -> Unit
+        }
+    }
+
+    private fun showAnthropicApiKeyDialog() {
+        val input = EditText(this).apply {
+            setText(KeyboardModeSettings.loadAnthropicApiKey(this@MainActivity))
+            hint = "Paste Anthropic API key"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Set Anthropic API key")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                KeyboardModeSettings.saveAnthropicApiKey(
+                    this,
+                    input.text?.toString().orEmpty()
+                )
+                refreshValues()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showOpenAiConfigurationDialog() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = (20 * resources.displayMetrics.density).toInt()
+            setPadding(padding, 0, padding, 0)
+        }
+        val presets = OpenAiProviderPreset.entries
+        val currentPreset = KeyboardModeSettings.loadOpenAiPreset(this)
+        val presetSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_item,
+                presets.map { it.displayName }
+            ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+            setSelection(presets.indexOf(currentPreset))
+        }
+        val baseUrlInput = EditText(this).apply {
+            hint = "Base URL (https://…/v1)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setText(KeyboardModeSettings.loadOpenAiBaseUrl(this@MainActivity))
+        }
+        val modelInput = EditText(this).apply {
+            hint = "Model identifier"
+            inputType = InputType.TYPE_CLASS_TEXT
+            setText(KeyboardModeSettings.loadOpenAiModel(this@MainActivity))
+        }
+        val apiKeyInput = EditText(this).apply {
+            hint = "API key"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            setText(KeyboardModeSettings.loadOpenAiApiKey(this@MainActivity))
+        }
+        fun applyPreset(preset: OpenAiProviderPreset, replaceModel: Boolean) {
+            val isCustom = preset == OpenAiProviderPreset.CUSTOM
+            baseUrlInput.isEnabled = isCustom
+            baseUrlInput.alpha = if (isCustom) 1f else 0.65f
+            if (!isCustom) {
+                baseUrlInput.setText(preset.defaultBaseUrl)
+                if (replaceModel || modelInput.text.isNullOrBlank()) {
+                    modelInput.setText(preset.defaultModel)
+                }
+            }
+        }
+        var initialSelectionDelivered = false
+        presetSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                applyPreset(
+                    presets[position],
+                    replaceModel = initialSelectionDelivered
+                )
+                initialSelectionDelivered = true
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+        applyPreset(currentPreset, replaceModel = false)
+        container.addView(TextView(this).apply {
+            text = "Service"
+            setPadding(0, 8, 0, 0)
+        })
+        container.addView(presetSpinner)
+        container.addView(baseUrlInput)
+        container.addView(modelInput)
+        container.addView(apiKeyInput)
+
+        AlertDialog.Builder(this)
+            .setTitle("OpenAI-compatible provider")
+            .setMessage("Choose a service to fill its endpoint and recommended model, then add your personal API key.")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                val preset = presets[presetSpinner.selectedItemPosition]
+                val baseUrl = baseUrlInput.text?.toString().orEmpty().trim().trimEnd('/')
+                val model = modelInput.text?.toString().orEmpty().trim()
+                val apiKey = apiKeyInput.text?.toString().orEmpty().trim()
+                val validHttpsUrl = runCatching {
+                    Uri.parse(baseUrl).let { it.scheme == "https" && !it.host.isNullOrBlank() }
+                }.getOrDefault(false)
+                if (!validHttpsUrl || model.isBlank() || apiKey.isBlank()) {
+                    Toast.makeText(
+                        this,
+                        "Enter an HTTPS base URL, model, and API key",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    KeyboardModeSettings.saveOpenAiConfiguration(
+                        this,
+                        preset,
+                        baseUrl,
+                        model,
+                        apiKey
+                    )
+                    refreshValues()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showHapticModeDialog() {
+        val modes = HapticMode.entries
+        val labels = arrayOf("Off", "System", "Light", "Medium", "Strong")
+        val current = KeyboardModeSettings.loadHapticMode(this)
+        AlertDialog.Builder(this)
+            .setTitle("Key vibration")
+            .setSingleChoiceItems(labels, modes.indexOf(current)) { dialog, which ->
+                KeyboardModeSettings.saveHapticMode(this, modes[which])
+                refreshValues()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showLanguageProfilesDialog() {
+        val (profileA, profileB) = KeyboardModeSettings.loadLanguageProfiles(this)
+        val labels = arrayOf(
+            "Profile A — ${formatLanguageProfile(profileA)}",
+            "Profile B — ${formatLanguageProfile(profileB)}"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Quick language profiles")
+            .setItems(labels) { _, which ->
+                showLanguageProfileLayoutDialog(
+                    if (which == 0) LanguageProfileSlot.A else LanguageProfileSlot.B
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showLanguageProfileLayoutDialog(slot: LanguageProfileSlot) {
+        val installed = LayoutPackManager.listInstalled(this)
+        if (installed.isEmpty()) return
+        val profile = if (slot == LanguageProfileSlot.A) {
+            KeyboardModeSettings.loadLanguageProfiles(this).first
+        } else {
+            KeyboardModeSettings.loadLanguageProfiles(this).second
+        }
+        val selected = installed.indexOfFirst { it.id == profile.layoutPackId }.coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle("Profile ${slot.name}: layout")
+            .setSingleChoiceItems(
+                installed.map(::formatLayoutPackLabel).toTypedArray(),
+                selected
+            ) { dialog, which ->
+                dialog.dismiss()
+                showLanguageProfileCorrectionDialog(slot, installed[which])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showLanguageProfileCorrectionDialog(
+        slot: LanguageProfileSlot,
+        pack: LayoutPack
+    ) {
+        val modes = KeyboardLanguageMode.entries
+        val labels = arrayOf("French", "English", "French + English", "Disabled")
+        val profile = if (slot == LanguageProfileSlot.A) {
+            KeyboardModeSettings.loadLanguageProfiles(this).first
+        } else {
+            KeyboardModeSettings.loadLanguageProfiles(this).second
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Profile ${slot.name}: autocorrect")
+            .setSingleChoiceItems(labels, modes.indexOf(profile.languageMode)) { dialog, which ->
+                KeyboardModeSettings.saveLanguageProfile(this, slot, pack.id, modes[which])
+                refreshValues()
+                dialog.dismiss()
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -365,11 +660,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showBottomKeyOptionsDialog(isLeftSlot: Boolean) {
-        val options = listOf(
-            BottomKeyPairOption(BottomKeyMode.AI, BottomKeyMode.EMOJI),
-            BottomKeyPairOption(BottomKeyMode.AI, BottomKeyMode.CLIPBOARD),
-            BottomKeyPairOption(BottomKeyMode.CLIPBOARD, BottomKeyMode.EMOJI)
-        )
+        val allModes = BottomKeyMode.entries
+        val options = allModes.flatMapIndexed { firstIndex, first ->
+            allModes.drop(firstIndex + 1).map { second -> BottomKeyPairOption(first, second) }
+        }
         val labels = options.map { formatBottomModePairLabel(it.first, it.second) }.toTypedArray()
         val (leftOptions, rightOptions) = KeyboardModeSettings.loadBottomSlotOptions(this)
         val currentSet = if (isLeftSlot) leftOptions.toSet() else rightOptions.toSet()
@@ -547,13 +841,42 @@ class MainActivity : AppCompatActivity() {
     private fun refreshValues() {
         val activeLayoutPack = LayoutPackManager.resolveActive(this)
         val isGboardLayout = activeLayoutPack.isGboardStyle()
-        statusText.text = maskApiKeyForDisplay(KeyboardModeSettings.loadGeminiApiKey(this))
+        val provider = KeyboardModeSettings.loadAiProvider(this)
+        aiProviderValue.text = when (provider) {
+            AiProvider.GEMINI -> "Gemini"
+            AiProvider.ANTHROPIC -> "Anthropic"
+            AiProvider.OPENAI_COMPATIBLE ->
+                KeyboardModeSettings.loadOpenAiPreset(this).displayName
+        }
+        val hasDedicatedModelRow = provider != AiProvider.OPENAI_COMPATIBLE
+        geminiModelRow.visibility = if (hasDedicatedModelRow) View.VISIBLE else View.GONE
+        aiModelDivider.visibility = if (hasDedicatedModelRow) View.VISIBLE else View.GONE
+        when (provider) {
+            AiProvider.GEMINI -> {
+                aiModelLabel.text = "Gemini model"
+                geminiModelValue.text = KeyboardModeSettings.loadGeminiModel(this).displayName
+            }
+            AiProvider.ANTHROPIC -> {
+                aiModelLabel.text = "Anthropic model"
+                geminiModelValue.text = KeyboardModeSettings.loadAnthropicModel(this).displayName
+            }
+            AiProvider.OPENAI_COMPATIBLE -> Unit
+        }
+        val configuredKey = when (provider) {
+            AiProvider.GEMINI -> KeyboardModeSettings.loadGeminiApiKey(this)
+            AiProvider.ANTHROPIC -> KeyboardModeSettings.loadAnthropicApiKey(this)
+            AiProvider.OPENAI_COMPATIBLE -> KeyboardModeSettings.loadOpenAiApiKey(this)
+        }
+        statusText.text = maskApiKeyForDisplay(configuredKey)
         languageValue.text = when (KeyboardModeSettings.loadLanguageMode(this)) {
             KeyboardLanguageMode.FRENCH -> "French"
             KeyboardLanguageMode.ENGLISH -> "English"
             KeyboardLanguageMode.BOTH -> "French + English"
             KeyboardLanguageMode.DISABLED -> "Disabled"
         }
+        val (profileA, profileB) = KeyboardModeSettings.loadLanguageProfiles(this)
+        languageProfilesValue.text =
+            "A: ${profileDisplayName(profileA)} • B: ${profileDisplayName(profileB)}"
         keyboardValue.text = keyboardSummary(activeLayoutPack)
         val hasImportedActiveLayout = activeLayoutPack.source == LayoutPackSource.IMPORTED
         uploadedLayoutNoticeCard.visibility = if (hasImportedActiveLayout) View.VISIBLE else View.GONE
@@ -606,13 +929,20 @@ class MainActivity : AppCompatActivity() {
         } else {
             "Disabled"
         }
+        hapticModeValue.text = when (KeyboardModeSettings.loadHapticMode(this)) {
+            HapticMode.OFF -> "Off"
+            HapticMode.SYSTEM -> "System"
+            HapticMode.LIGHT -> "Light"
+            HapticMode.MEDIUM -> "Medium"
+            HapticMode.STRONG -> "Strong"
+        }
         val (leftOptions, rightOptions) = KeyboardModeSettings.loadBottomSlotOptions(this)
         val importedCount = LayoutPackManager.listImported(this).size
         deleteLayoutPackValue.text = if (importedCount <= 0) "None" else "$importedCount imported"
         deleteLayoutPackRow.isEnabled = importedCount > 0
         deleteLayoutPackRow.alpha = if (importedCount > 0) 1f else 0.5f
         leftKeyModesValue.text = if (isGboardLayout) {
-            "Single key (hold AI for AI/Clipboard/Emoji)"
+            "Single key (hold for tools)"
         } else {
             formatBottomModePairLabel(leftOptions[0], leftOptions[1])
         }
@@ -654,6 +984,33 @@ class MainActivity : AppCompatActivity() {
             BottomKeyMode.AI -> "AI"
             BottomKeyMode.CLIPBOARD -> "Clipboard"
             BottomKeyMode.EMOJI -> "Emoji"
+            BottomKeyMode.LANGUAGE -> "Language"
+            BottomKeyMode.APOSTROPHE -> "Apostrophe"
+        }
+    }
+
+    private fun formatLanguageProfile(profile: LanguageProfile): String {
+        val pack = LayoutPackManager.listInstalled(this)
+            .firstOrNull { it.id == profile.layoutPackId }
+            ?.displayName
+            ?: profile.layoutPackId
+        return "$pack, ${languageModeLabel(profile.languageMode)}"
+    }
+
+    private fun profileDisplayName(profile: LanguageProfile): String {
+        val layoutName = LayoutPackManager.listInstalled(this)
+            .firstOrNull { it.id == profile.layoutPackId }
+            ?.displayName
+            ?: profile.layoutPackId
+        return resolveLanguageProfileDisplayName(profile.customName, layoutName)
+    }
+
+    private fun languageModeLabel(mode: KeyboardLanguageMode): String {
+        return when (mode) {
+            KeyboardLanguageMode.FRENCH -> "French"
+            KeyboardLanguageMode.ENGLISH -> "English"
+            KeyboardLanguageMode.BOTH -> "French + English"
+            KeyboardLanguageMode.DISABLED -> "Disabled"
         }
     }
 

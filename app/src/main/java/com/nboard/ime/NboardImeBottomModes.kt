@@ -55,7 +55,48 @@ internal fun NboardImeService.performBottomModeTap(mode: BottomKeyMode) {
         }
         BottomKeyMode.CLIPBOARD -> toggleClipboardMode()
         BottomKeyMode.EMOJI -> toggleEmojiMode()
+        BottomKeyMode.LANGUAGE -> switchQuickLanguageProfile()
+        BottomKeyMode.APOSTROPHE -> {
+            closeTransientBottomModePanels()
+            commitKeyText("'")
+        }
     }
+}
+
+internal fun NboardImeService.switchQuickLanguageProfile() {
+    closeTransientBottomModePanels()
+    KeyboardModeSettings.switchLanguageProfile(this)
+    activeLayoutPack = LayoutPackManager.resolveActive(this)
+    keyboardLanguageMode = KeyboardModeSettings.loadLanguageMode(this)
+    predictionRenderCache = null
+    hasPredictionSuggestions = false
+    pendingAutoCorrection = null
+    if (isBigramPredictorInitialized()) {
+        bigramPredictor.setModeFromKeyboardMode(keyboardLanguageMode)
+    }
+    autoCorrectEngine.setModeFromKeyboardMode(keyboardLanguageMode)
+    reloadBottomModesFromSettings()
+    renderKeyRows()
+    refreshUi()
+    toast(
+        if (KeyboardModeSettings.loadActiveLanguageProfileSlot(this) == LanguageProfileSlot.A) {
+            "Language profile A"
+        } else {
+            "Language profile B"
+        }
+    )
+}
+
+private fun NboardImeService.closeTransientBottomModePanels() {
+    dismissActivePopup()
+    isAiMode = false
+    isClipboardOpen = false
+    isEmojiMode = false
+    isEmojiSearchMode = false
+    isNumbersMode = false
+    isSymbolsSubmenuOpen = false
+    setGenerating(false)
+    clearInlinePromptFocus()
 }
 
 internal fun NboardImeService.toggleClipboardMode() {
@@ -199,6 +240,8 @@ internal fun NboardImeService.iconResForBottomMode(mode: BottomKeyMode): Int {
         BottomKeyMode.AI -> R.drawable.ic_ai_custom
         BottomKeyMode.CLIPBOARD -> R.drawable.ic_clipboard_lucide
         BottomKeyMode.EMOJI -> R.drawable.ic_smile_lucide
+        BottomKeyMode.LANGUAGE -> R.drawable.ic_globe_lucide
+        BottomKeyMode.APOSTROPHE -> R.drawable.ic_apostrophe_custom
     }
 }
 
@@ -296,6 +339,8 @@ internal fun NboardImeService.isBottomModeSelected(mode: BottomKeyMode): Boolean
         BottomKeyMode.AI -> isAiMode && isAiAllowedInCurrentContext()
         BottomKeyMode.CLIPBOARD -> isClipboardOpen
         BottomKeyMode.EMOJI -> isEmojiMode
+        BottomKeyMode.LANGUAGE,
+        BottomKeyMode.APOSTROPHE -> false
     }
 }
 

@@ -312,7 +312,7 @@
                         android:layout_marginStart="8dp"
                         android:layout_weight="1"
                         android:fontFamily="@font/inter_variable"
-                        android:text="Gemini integration"
+                        android:text="AI integration (Gemini default)"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textSize="15sp" />
 

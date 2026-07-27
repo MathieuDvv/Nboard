@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.5.1] - 2026-07-28
+
+### Added
+- Added a dedicated language-profile settings page for configuring both profiles in one place.
+- Added optional custom profile names, with the selected layout name used automatically when blank.
+- Added per-profile left/right special-key mappings and active modes, restored automatically when switching profiles.
+- Added Anthropic with Claude Sonnet 5, Claude Haiku 4.5, and Claude Opus 5 model choices.
+- Added OpenAI-compatible service presets for OpenAI, DeepSeek, Kimi, Groq, and OpenRouter, while retaining a custom endpoint option.
+
+### Changed
+- Fused AI provider, model, and configuration rows into one settings card.
+- Replaced token-only swipe decoding with keyboard-aware path geometry, endpoint scoring, and language-model reranking, while retaining the previous decoder as a fallback.
+- Swipe paths are now sampled independently from the optional visual trail, preventing fast gestures and words beginning with `H` from silently producing no result.
+
+## [1.5.0] - 2026-07-28
+
+### Added
+- Added Gemini and custom HTTPS OpenAI-compatible AI providers with separate saved configurations.
+- Added a Gemini model picker with Gemini 3.6 Flash as the default, plus Gemini 3.5 Flash and Gemini 3.5 Flash-Lite.
+- Added two quick language profiles that pair a layout pack with an autocorrect language.
+- Added Language and Apostrophe actions to the configurable special keys.
+- Added `Off`, `System`, `Light`, `Medium`, and `Strong` key-vibration settings.
+
+### Fixed
+- Removed dead touch zones between keys by routing gap touches to the nearest key ([#9](https://github.com/MathieuDvv/Nboard/issues/9)).
+- Improved fast swipe gesture sampling so intermediate keys are not lost, including the reported `h`/`hui` failure ([#11](https://github.com/MathieuDvv/Nboard/issues/11)).
+- Made keyboard vibration user-configurable instead of forcing feedback ([#6](https://github.com/MathieuDvv/Nboard/issues/6)).
+
+### Notes
+- Thank you to the Nboard community for reaching 100 GitHub stars.
+
 ## [1.4.1] - 2026-03-02
 
 ### Added
