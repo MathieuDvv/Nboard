@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Author: Everelsu (https://github.com/Everelsu)
+
+  Russian ЙЦУКЕН, Gboard grid and Gboard-style "long press for symbols":
+  - rows 1 and 2 have 11 keys of equal width, row 3 has 9 letters between Shift and Backspace
+  - qwertyLike="false" so row 2 is not shrunk by the Qwerty half-key inset
+  - row 1 long-press gives digits (added by the app when the number row is off), ё on е, ъ on х
+  - rows 2 and 3 long-press give symbols, ъ on ь, Russian quotes « » on б ю
+-->
+<layout-pack
+    id="community.russian.jcuken"
+    name="Русская ЙЦУКЕН (Gboard)"
+    bottomStyle="gboard"
+    qwertyLike="false">
+
+    <row1>й ц у к е н г ш щ з х</row1>
+    <row2>ф ы в а п р о л д ж э</row2>
+    <row3>я ч с м и т ь б ю</row3>
+
+    <variants>
+        <key value="е">ё</key>
+        <key value="х">ъ</key>
+
+        <key value="ф">@</key>
+        <key value="ы">#</key>
+        <key value="в">₽ $ €</key>
+        <key value="а">_</key>
+        <key value="п">&amp;</key>
+        <key value="р">- —</key>
+        <key value="о">+</key>
+        <key value="л">(</key>
+        <key value="д">)</key>
+        <key value="ж">/</key>
+        <key value="э">№</key>
+
+        <key value="я">*</key>
+        <key value="ч">"</key>
+        <key value="с">'</key>
+        <key value="м">:</key>
+        <key value="и">;</key>
+        <key value="т">!</key>
+        <key value="ь">ъ ?</key>
+        <key value="б">«</key>
+        <key value="ю">»</key>
+    </variants>
+</layout-pack>
